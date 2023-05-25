@@ -1,9 +1,0 @@
-# ninja log v5
-1	1833	1684984234314583052	CMakeFiles/LUTViewer.dir/src/Graph.cpp.o	40d15c5d31a3766b
-1	1665	1684984234137658689	CMakeFiles/LUTViewer.dir/src/Node.cpp.o	deeaf92a46f16d31
-1	211	1684984759706754025	build.ninja	deb26adb8140333
-2433	2872	1684984566821500650	LUTViewer	a6b11c26b903b8b
-3	1721	1684984234200132660	CMakeFiles/LUTViewer.dir/src/datatemplate.cpp.o	7c4aa89d12b506d6
-1	1659	1684984234134839486	CMakeFiles/LUTViewer.dir/src/Matrices.cpp.o	c596beb40c62355e
-23	2432	1684984566387768083	CMakeFiles/LUTViewer.dir/main.cpp.o	3e322566b625de0
-2	230	1684984232711885918	CMakeFiles/LUTViewer.dir/src/Timer.cpp.o	60bc3624ec6ec3bd
