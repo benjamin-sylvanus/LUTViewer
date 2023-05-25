@@ -3,3 +3,9 @@
 /.idea/
 /src/*.swc
 
+
+/ViewLib/cmake-build-debug/
+/ViewLib/cmake-build-debug-coverage/
+
+/ViewLib/lib/
+
