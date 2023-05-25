@@ -5,17 +5,16 @@
 Simple OpenGL Application to visualize LUTs (Look Up Tables) in 3D.
 
 ## Dependencies
-
-- [GLFW](https://www.glfw.org/)
 - [OpenGL](https://www.opengl.org/)
+- [GLUT](https://www.opengl.org/resources/libraries/glut/)
 - [GLM](https://glm.g-truc.net/0.9.9/index.html)
 
 I'd recommend using a package manager like [Homebrew](https://brew.sh/) to install the dependencies.
 
 ```
-brew install glfw
-brew install glm
 brew install opengl
+brew install glut
+brew install glm
 ```
 
 ## Installation
