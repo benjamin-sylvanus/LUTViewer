@@ -76,10 +76,11 @@ std::vector<std::vector<uint64_t> > readdims(std::string path);
 
 int s2i(std::vector<int> v, std::vector<int> dims);
 
+void preprocessData();
+
 // constants
 const int SCREEN_WIDTH = 600;
 const int SCREEN_HEIGHT = 600;
-const int CIRCLE_SECTORS = 128;
 
 // global variables
 void *font = GLUT_BITMAP_8_BY_13;
@@ -97,14 +98,20 @@ bool animating = true;
 std::vector<Vector3> path_test;
 std::vector<Vector3> gstart;
 std::vector<Vector3> gend;
-std::vector<float> rstart;
-std::vector<float> rend;
 std::vector<std::vector<Vector3> > path_test_v;
-std::vector<Vector3> circle;
 std::vector<Vector3> colors;
 std::vector<float> Radii;
 Vector3 center(0, 0, 0);
 std::vector<Vector3> cubes;
+
+
+// new
+std::vector<std::vector<float> > data;
+std::vector<std::vector<float> > swcdata;
+std::vector<std::vector<uint64_t> > dims;
+std::vector<std::uint64_t> lut;
+std::vector<std::vector<std::vector<int> > > lutdata;
+std::vector<int> lutindex;
 
 void drawSphere() {
     // set material
@@ -132,7 +139,6 @@ void drawSphere() {
     }
     glMaterialfv(GL_FRONT, GL_DIFFUSE, diffuse); // reset diffuse
 }
-
 
 void drawCube() {
     // set material
@@ -214,6 +220,7 @@ void draw() {
 }
 
 
+
 ///////////////////////////////////////////////////////////////////////////////
 int main(int argc, char **argv) {
     // read an swc file and create a pipe from it
@@ -231,150 +238,27 @@ int main(int argc, char **argv) {
     }
 
     // read the data
-    std::vector<std::vector<float> > data = loadSWC(filename);
+    data = loadSWC(filename);
 
     // load the lookup table using the datatemplate class
     datatemplate<std::uint64_t> lutreader("/Users/benjaminsylvanus/Documents/work/LUTViewer/src/data/lut.bin");
-    std::vector<std::uint64_t> lut = lutreader.data;
+    lut = lutreader.data;
 
     // load the index table using the datatemplate class
     datatemplate<int> indexreader("/Users/benjaminsylvanus/Documents/work/LUTViewer/src/data/index.bin");
-    std::vector<int> index = indexreader.data;
+    lutindex = indexreader.data;
 
-    std::vector<std::vector<uint64_t> > dims = readdims(
-            "/Users/benjaminsylvanus/Documents/work/LUTViewer/src/data/dims.txt");
+    dims = readdims("/Users/benjaminsylvanus/Documents/work/LUTViewer/src/data/dims.txt");
 
-    // print all the loaded data
+    // print some info
     std::cout << "LUT size: " << lut.size() << std::endl;
-    std::cout << "Index size: " << index.size() << std::endl;
+    std::cout << "Index size: " << lutindex.size() << std::endl;
     std::cout << "Dims size: " << dims.size() << std::endl;
 
-    // extract the dimensions of the swc lut and index from the dims
-    int SWCDIMS[2] = {static_cast<int>(dims[0][0]), static_cast<int>(dims[0][1])};
-    int LUTDIMS[3] = {static_cast<int>(dims[1][0]), static_cast<int>(dims[1][1]), static_cast<int>(dims[1][2])};
-    int INDDIMS[3] = {static_cast<int>(dims[2][0]), static_cast<int>(dims[2][1]), static_cast<int>(dims[2][2])};
+    // Preprocess the data
+    preprocessData();
 
-    std::cout << "SWC dims: " << SWCDIMS[0] << " " << SWCDIMS[1] << std::endl;
-    std::cout << "LUT dims: " << LUTDIMS[0] << " " << LUTDIMS[1] << " " << LUTDIMS[2] << std::endl;
-    std::cout << "Index dims: " << INDDIMS[0] << " " << INDDIMS[1] << " " << INDDIMS[2] << std::endl;
-
-    // reshape the datas
-    std::vector<std::vector<std::vector<int> > > lutdata;
-
-    lutdata.resize(LUTDIMS[0], std::vector<std::vector<int> >(LUTDIMS[1], std::vector<int>(LUTDIMS[2], 0)));
-
-    std::cout << "Created arrays" << std::endl;
-
-    // lut has the form [y,x,z]
-    for (int i = 0; i < LUTDIMS[0]; i++) {
-        for (int j = 0; j < LUTDIMS[1]; j++) {
-            for (int k = 0; k < LUTDIMS[2]; k++) {
-                // calculate the index of the lut
-                // index = y * xdim * zdim + x * zdim + z
-                std::vector<int> index;
-                index.push_back(i);
-                index.push_back(j);
-                index.push_back(k);
-                std::vector<int> dims;
-                dims.push_back(LUTDIMS[0]);
-                dims.push_back(LUTDIMS[1]);
-                dims.push_back(LUTDIMS[2]);
-                int ind = s2i(index, dims);
-                lutdata[i][j][k] = lut[ind];
-            }
-        }
-    }
-
-    std::cout << "LUT data: " << lutdata[0][0][0] << std::endl;
-
-    // create a vector of cubes to draw
-    for (int i = 0; i < LUTDIMS[0]; i++) {
-        for (int j = 0; j < LUTDIMS[1]; j++) {
-            for (int k = 0; k < LUTDIMS[2]; k++) {
-                if (lutdata[i][j][k] > 0) {
-                    float x, y, z;
-                    x = (float) i;
-                    y = (float) j;
-                    z = (float) k;
-                    Vector3 cube = Vector3(x, y, z);
-                    cubes.push_back(cube);
-                }
-            }
-        }
-    }
-
-
-    // set the first connections parent to 1
-    data[0][5] = 1;
-
-    // add each connection to the global variables gstart and gend
-    for (int i = 0; i < data.size(); i++) {
-        Radii.push_back(data[i][4]);
-        // get the curr x y z r id parent
-        float cx = data[i][1];
-        float cy = data[i][2];
-        float cz = data[i][3];
-        float cr = data[i][4];
-        int cid = (int) data[i][0];
-        int cparent = (int) data[i][5] - 1;
-
-        // get the parent x y z r
-        float px = data[cparent][1];
-        float py = data[cparent][2];
-        float pz = data[cparent][3];
-        float pr = data[cparent][4];
-
-        // create the start and end vectors
-        Vector3 start(cx, cy, cz);
-        Vector3 end(px, py, pz);
-
-        // add the start and end to the global variables
-        gstart.push_back(start);
-        gend.push_back(end);
-        rstart.push_back(cr);
-        rend.push_back(pr);
-
-        // normalize the radius
-        float r = cr;
-        float g = 0;
-        float b = (1.0 - r) / 1.5;
-
-        //
-        Vector3 color(r, g, b);
-        colors.push_back(color);
-    }
-
-    // calculate the center of the data
-    float cx = 0;
-    float cy = 0;
-    float cz = 0;
-    for (int i = 0; i < gstart.size(); i++) {
-        cx += gstart[i].x;
-        cy += gstart[i].y;
-        cz += gstart[i].z;
-    }
-    cx /= gstart.size();
-    cy /= gstart.size();
-    cz /= gstart.size();
-    center = Vector3(cx, cy, cz);
-    std::cout << "center: " << center.x << " " << center.y << " " << center.z << std::endl;
-
-    // translate the data to the center
-    for (int i = 0; i < gstart.size(); i++) {
-        gstart[i].x -= center.x;
-        gstart[i].y -= center.y;
-        gstart[i].z -= center.z;
-        gend[i].x -= center.x;
-        gend[i].y -= center.y;
-        gend[i].z -= center.z;
-    }
-
-    // translate the cubes to the center
-    for (int i = 0; i < cubes.size(); i++) {
-        cubes[i].x -= center.x;
-        cubes[i].y -= center.y;
-        cubes[i].z -= center.z;
-    }
+    // init shared memory
     initSharedMem();
 
     // register exit callback
@@ -528,7 +412,7 @@ bool initSharedMem() {
 
 
 ///////////////////////////////////////////////////////////////////////////////
-// clean up shared me`mory
+// clean up shared memory
 ///////////////////////////////////////////////////////////////////////////////
 void clearSharedMem() {
 }
@@ -658,7 +542,6 @@ void showInfo() {
     glPopMatrix();                   // restore to previous modelview matrix
 }
 
-
 //=============================================================================
 // CALLBACKS
 //=============================================================================
@@ -683,7 +566,6 @@ void displayCB() {
     glutSwapBuffers();
 }
 
-
 void reshapeCB(int width, int height) {
     screenWidth = width;
     screenHeight = height;
@@ -701,12 +583,10 @@ void reshapeCB(int width, int height) {
     glLoadIdentity();
 }
 
-
 void timerCB(int millisec) {
     glutTimerFunc(millisec, timerCB, millisec);
     glutPostRedisplay();
 }
-
 
 void keyboardCB(unsigned char key, int x, int y) {
     switch (key) {
@@ -744,7 +624,6 @@ void keyboardCB(unsigned char key, int x, int y) {
     glutPostRedisplay();
 }
 
-
 void mouseCB(int button, int state, int x, int y) {
     mouseX = x;
     mouseY = y;
@@ -778,17 +657,14 @@ void mouseMotionCB(int x, int y) {
 
 }
 
-
 void mousePassiveMotionCB(int x, int y) {
     mouseX = x;
     mouseY = y;
 }
 
-
 void exitCB() {
     clearSharedMem();
 }
-
 
 std::vector<std::vector<std::uint64_t> > readdims(std::string path) {
     std::cout << "Path: " << path << std::endl;
@@ -814,15 +690,125 @@ std::vector<std::vector<std::uint64_t> > readdims(std::string path) {
     return v;
 }
 
-int s2i(std::vector<int> v, std::vector<int> dims) {
-    int bx = dims[0];
-    int by = dims[1];
-    int bz = dims[2];
+int s2i(std::vector<int> v, std::vector<int> d) {
+    int bx = d[0];
+    int by = d[1];
+    int bz = d[2];
     int ix = v[0];
     int iy = v[1];
     int iz = v[2];
 
     return 0 + bx * (by * iz + iy) + ix;
+}
+
+void preprocessData() {
+// extract the dimensions of the swc lut and index from the dims
+    int SWCDIMS[2] = {static_cast<int>(dims[0][0]), static_cast<int>(dims[0][1])};
+    int LUTDIMS[3] = {static_cast<int>(dims[1][0]), static_cast<int>(dims[1][1]), static_cast<int>(dims[1][2])};
+    int INDDIMS[3] = {static_cast<int>(dims[2][0]), static_cast<int>(dims[2][1]), static_cast<int>(dims[2][2])};
+
+    std::cout << "SWC dims: " << SWCDIMS[0] << " " << SWCDIMS[1] << std::endl;
+    std::cout << "LUT dims: " << LUTDIMS[0] << " " << LUTDIMS[1] << " " << LUTDIMS[2] << std::endl;
+    std::cout << "Index dims: " << INDDIMS[0] << " " << INDDIMS[1] << " " << INDDIMS[2] << std::endl;
+
+    // set the dims of the lut
+    lutdata.resize(LUTDIMS[0], std::vector<std::vector<int> >(LUTDIMS[1], std::vector<int>(LUTDIMS[2], 0)));
+
+    std::vector<int> localdims = {LUTDIMS[0], LUTDIMS[1], LUTDIMS[2]};
+
+    // lut has the form [y,x,z]
+    for (int i = 0; i < LUTDIMS[0]; i++) {
+        for (int j = 0; j < LUTDIMS[1]; j++) {
+            for (int k = 0; k < LUTDIMS[2]; k++) {
+                // calculate the index of the lut
+                std::vector<int> subscript = {i, j, k};
+                int ind = s2i(subscript, localdims);
+                lutdata[i][j][k] = lut[ind];
+            }
+        }
+    }
+
+    // create a vector of cubes to draw
+    for (int i = 0; i < LUTDIMS[0]; i++) {
+        for (int j = 0; j < LUTDIMS[1]; j++) {
+            for (int k = 0; k < LUTDIMS[2]; k++) {
+                if (lutdata[i][j][k] > 0) {
+                    cubes.push_back(Vector3((float) i, (float) j, (float) k));
+                }
+            }
+        }
+    }
+
+    // set the first connections parent to 1
+    data[0][5] = 1;
+
+    // add each connection to the global variables gstart and gend
+    for (int i = 0; i < data.size(); i++) {
+        Radii.push_back(data[i][4]);
+        // get the curr x y z r id parent
+        float cx = data[i][1];
+        float cy = data[i][2];
+        float cz = data[i][3];
+        float cr = data[i][4];
+        int cid = (int) data[i][0];
+        int cparent = (int) data[i][5] - 1;
+
+        // get the parent x y z r
+        float px = data[cparent][1];
+        float py = data[cparent][2];
+        float pz = data[cparent][3];
+        float pr = data[cparent][4];
+
+        // create the start and end vectors
+        Vector3 start(cx, cy, cz);
+        Vector3 end(px, py, pz);
+
+        // add the start and end to the global variables
+        gstart.push_back(start);
+        gend.push_back(end);
+
+        // normalize the radius
+        float r = cr;
+        float g = 0;
+        float b = (1.0 - r) / 1.5;
+
+        Vector3 color(r, g, b);
+        colors.push_back(color);
+    }
+
+    // calculate the center of the data
+    float cx = 0;
+    float cy = 0;
+    float cz = 0;
+    for (int i = 0; i < gstart.size(); i++) {
+        cx += gstart[i].x;
+        cy += gstart[i].y;
+        cz += gstart[i].z;
+    }
+    cx /= gstart.size();
+    cy /= gstart.size();
+    cz /= gstart.size();
+    center = Vector3(cx, cy, cz);
+    std::cout << "center: " << center.x << " " << center.y << " " << center.z << std::endl;
+
+    // translate the data to the center
+    for (int i = 0; i < gstart.size(); i++) {
+        gstart[i].x -= center.x;
+        gstart[i].y -= center.y;
+        gstart[i].z -= center.z;
+        gend[i].x -= center.x;
+        gend[i].y -= center.y;
+        gend[i].z -= center.z;
+    }
+
+    // translate the cubes to the center
+    for (int i = 0; i < cubes.size(); i++) {
+        cubes[i].x -= center.x;
+        cubes[i].y -= center.y;
+        cubes[i].z -= center.z;
+    }
+
+
 }
 
 #pragma clang diagnostic pop

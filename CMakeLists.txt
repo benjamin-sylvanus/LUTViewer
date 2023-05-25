@@ -4,7 +4,7 @@ project(LUTViewer VERSION 1.0)
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
-link_directories(${CMAKE_SOURCE_DIR}/lib)
+#link_directories(${CMAKE_SOURCE_DIR}/lib)
 
 file(GLOB SOURCES "src/*.cpp")
 
